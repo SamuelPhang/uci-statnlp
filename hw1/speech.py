@@ -1,5 +1,5 @@
 #!/bin/python
-
+import global_settings as g
 def read_files(tarfname):
 	"""Read the training and development data from the speech tar file.
 	The returned object contains various fields that store the data, such as:
@@ -27,8 +27,13 @@ def read_files(tarfname):
 	speech.dev_data, speech.dev_fnames, speech.dev_labels = read_tsv(tar, "dev.tsv")
 	print(len(speech.dev_data))
 	print("-- transforming data and labels")
-	from sklearn.feature_extraction.text import CountVectorizer
-	speech.count_vect = CountVectorizer()
+
+	if g.tfidf:
+		from sklearn.feature_extraction.text import TfidfVectorizer
+		speech.count_vect = TfidfVectorizer(stop_words=g.stop_vocab, ngram_range=(1, g.ngram_max), use_idf=g.use_idf)
+	else:
+		from sklearn.feature_extraction.text import CountVectorizer
+		speech.count_vect = CountVectorizer(ngram_range=(1, g.ngram_max))
 	speech.trainX = speech.count_vect.fit_transform(speech.train_data)
 	speech.devX = speech.count_vect.transform(speech.dev_data)
 	from sklearn import preprocessing
