@@ -35,10 +35,11 @@ def read_files(tarfname):
 
     if g.tfidf:
         from sklearn.feature_extraction.text import TfidfVectorizer
-        speech.count_vect = TfidfVectorizer(stop_words=g.stop_vocab, ngram_range=(1, g.ngram_max), use_idf=g.use_idf)
+        speech.count_vect = TfidfVectorizer(stop_words=g.stop_vocab, ngram_range=(1, g.ngram_max), use_idf=g.use_idf,
+                                            analyzer=g.analyzer, sublinear_tf=g.sublinear_tf)
     else:
         from sklearn.feature_extraction.text import CountVectorizer
-        speech.count_vect = CountVectorizer(ngram_range=(1, g.ngram_max))
+        speech.count_vect = CountVectorizer(ngram_range=(g.ngram_min, g.ngram_max))
     speech.trainX = speech.count_vect.fit_transform(speech.train_data)
     speech.devX = speech.count_vect.transform(speech.dev_data)
     from sklearn import preprocessing

@@ -13,11 +13,11 @@ def train_classifier(X, y):
         from sklearn import preprocessing
         X = preprocessing.scale(X, with_mean=False)
     clf = GridSearchCV(
-        LogisticRegression(), g.gridSearchParams, n_jobs=-1
+        LogisticRegression(), g.gridSearchParams, n_jobs=g.num_jobs, verbose=g.gridsearch_verbosity
     )
     clf.fit(X, y)
     print(clf.best_params_)
-    cls = LogisticRegression(**clf.best_params_)
+    cls = LogisticRegression(**clf.best_params_, verbose=g.training_verbosity)
     cls.fit(X, y)
     return cls
 
