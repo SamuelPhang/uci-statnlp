@@ -1,4 +1,4 @@
-from . import speech
+import hw1.speech as s
 import numpy as np
 import pandas as pd
 
@@ -24,7 +24,7 @@ def top_mean_feats(Xtr, features, grp_ids, min_tfidf=0.1, top_n=25):
     return top_tfidf_feats(tfidf_means, features, top_n)
 
 if __name__ == "__main__":
-    speech.main()
+    s.main()
 
 #get top tfidf scores averaged
     rand_indices = np.random.randint(0, (speech.trainX.shape[0]) - 1, 50)

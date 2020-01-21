@@ -1,23 +1,41 @@
 #!/bin/python
 import numpy
-C = numpy.logspace(-2, 3, 5)
+C = numpy.linspace(1, 30, 10)
 max_iter = 10000
 num_jobs = 6
 gridsearch_verbosity = 3
-training_verbosity = 3
+training_verbosity = 0
 
-solver = ['sag', 'saga']#'liblinear', 'lbfgs']
-scaling = True
+solver = ['lbfgs']#'liblinear', 'sag']#, 'lbfgs']
+scaling = False
+
+#tfidfvectorizer params
+import nltk
+from nltk import word_tokenize
+from nltk.stem import WordNetLemmatizer
+nltk.download('punkt')
+nltk.download('wordnet')
+class LemmaTokenizer:
+    def __init__(self):
+        self.wnl = WordNetLemmatizer()
+    def __call__(self, doc):
+        return [self.wnl.lemmatize(t) for t in word_tokenize(doc)]
+
 tfidf = True
-analyzer = 'char_wb'
+analyzer = 'word' #char_wb'
 use_idf = True
-ngram_min = 3
-ngram_max = 10
+ngram_min = 1
+ngram_max = 1
 stop_vocab = None
 sublinear_tf = True
+binary = False
+tokenizer = LemmaTokenizer() #None
 
+use_grid_search = True
 gridSearchParams = {'C': C,
                     'solver': solver,
                     'max_iter': [max_iter]}
-    #,
-    #               'fit_intercept': [True, False]}
+
+nonGridSearchParams = {'C': 27
+                       , 'solver': 'liblinear'
+                       , 'max_iter': max_iter}

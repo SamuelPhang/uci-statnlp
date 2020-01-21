@@ -1,6 +1,5 @@
 #!/bin/python
-import global_settings as g
-
+import hw1.global_settings as g
 
 def read_files(tarfname):
     """Read the training and development data from the speech tar file.
@@ -35,11 +34,11 @@ def read_files(tarfname):
 
     if g.tfidf:
         from sklearn.feature_extraction.text import TfidfVectorizer
-        speech.count_vect = TfidfVectorizer(stop_words=g.stop_vocab, ngram_range=(1, g.ngram_max), use_idf=g.use_idf,
-                                            analyzer=g.analyzer, sublinear_tf=g.sublinear_tf)
+        speech.count_vect = TfidfVectorizer(stop_words=g.stop_vocab, ngram_range=(g.ngram_min, g.ngram_max), use_idf=g.use_idf,
+                                            analyzer=g.analyzer, sublinear_tf=g.sublinear_tf, binary=g.binary, tokenizer=g.tokenizer)
     else:
         from sklearn.feature_extraction.text import CountVectorizer
-        speech.count_vect = CountVectorizer(ngram_range=(g.ngram_min, g.ngram_max))
+        speech.count_vect = CountVectorizer(ngram_range=(g.ngram_min, g.ngram_max), binary=g.binary, tokenizer=g.tokenizer)
     speech.trainX = speech.count_vect.fit_transform(speech.train_data)
     speech.devX = speech.count_vect.transform(speech.dev_data)
     from sklearn import preprocessing
@@ -177,7 +176,7 @@ def read_instance(tar, ifname):
     return content
 
 
-if __name__ == "__main__":
+def main():
     print("Reading data")
     tarfname = "data/speech.tar.gz"
     speech = read_files(tarfname)
@@ -194,6 +193,9 @@ if __name__ == "__main__":
     print("Writing pred file")
     write_pred_kaggle_file(unlabeled, cls, "data/speech-pred.csv", speech)
 
+
+if __name__ == "__main__":
+    main()
 # You can't run this since you do not have the true labels
 # print "Writing gold file"
 # write_gold_kaggle_file("data/speech-unlabeled.tsv", "data/speech-gold.csv")
