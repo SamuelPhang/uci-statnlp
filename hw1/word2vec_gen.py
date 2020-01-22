@@ -1,28 +1,33 @@
+from hw1 import global_settings as g
+
 from gensim.models import Word2Vec
 from gensim.utils import any2utf8
 import nltk
 from nltk import word_tokenize
 from nltk.stem import WordNetLemmatizer
+
 nltk.download('punkt')
 nltk.download('wordnet')
+
 
 def read_files(tarfname):
     """Read all files from the tar file as a list of documents"""
     import tarfile
-    tar = tarfile.open(tarfname, "r:gz")
+    tar = tarfile.open(tarfname, "r:gz");
 
     class Data:
         pass
 
     unlabeled = Data()
     unlabeled.data = []
-    #unlabeled.fnames = []
+    # unlabeled.fnames = []
     for m in tar.getmembers():
         if ".txt" in m.name:
-            #unlabeled.fnames.append(m.name)
+            # unlabeled.fnames.append(m.name)
             unlabeled.data.append(read_instance(tar, m.name))
     tar.close()
     return unlabeled.data
+
 
 def read_instance(tar, ifname):
     inst = tar.getmember(ifname)
@@ -30,13 +35,16 @@ def read_instance(tar, ifname):
     content = ifile.read().strip()
     return content
 
+
 if __name__ == "__main__":
     print("Reading files")
     tarfname = "data/speech.tar.gz"
     docs = read_files(tarfname)
     lmtzr = WordNetLemmatizer()
     print("Lemmatizing and Tokenizing")
-    lemmatized = [[lmtzr.lemmatize(word) for word in word_tokenize(d.decode("utf-8"))] for d in docs]
+    lemmatized = [
+        [lmtzr.lemmatize(word).lower().strip('.,;:') for word in word_tokenize(d.decode("utf-8")) if len(word) >= g.min_length] for d
+        in docs]
     print("Computing Word2Vec Matrix")
-    wv = Word2Vec(lemmatized)
+    wv = Word2Vec(lemmatized, workers=g.num_jobs, min_count=0)
     wv.save("word2vec.model")
