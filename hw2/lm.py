@@ -70,9 +70,10 @@ class LangModel:
 
 
 class Unigram(LangModel):
-    def __init__(self, unk_prob=0.0001):
+    def __init__(self, smooth_lambda=1, unk_prob=0.0001):
         self.model = dict()
         self.lunk_prob = log(unk_prob, 2)
+        self.smooth = smooth_lambda
 
     def inc_word(self, w):
         if w in self.model:
@@ -106,12 +107,23 @@ class Unigram(LangModel):
     class Ngram(LangModel):
         def __init__(self, unk_prob=0.0001, n=3):
             self.model = dict()
+            from collections import defaultdict
+            self.totals = defaultdict(int)  # total count for every word
             self.lunk_prob = log(unk_prob, 2)
             if n > 0:
                 self.n = n
             else:
                 print('N must be 1 or greater')
                 raise ValueError()
+
+        def fit_corpus(self, corpus):
+            """Learn the language model for the whole corpus.
+
+            The corpus consists of a list of sentences."""
+            self.__get_totals(corpus)
+            for s in corpus:
+                self.fit_sentence(s)
+            # self.norm()
 
         def inc_word(self, context):
             """Given a list containing a word and its previous N-1 words, add these to the model and update the count.
@@ -133,30 +145,59 @@ class Unigram(LangModel):
                     else:
                         curr_level[w] = 1.0
 
+        def __get_totals(self, corpus):
+            for s in corpus:
+                for w in s:
+                    self.totals[w] += 1
+                self.totals['END_OF_SENTENCE'] += 1
+
         def fit_sentence(self, sentence):
-            """Add start of sentence markers and place words and their contexts into model"""
+            """Add start of sentence markers and place words and their contexts into model. self.totals must be
+            computed already """
+            unks = self.__unk_parse()  # get set of unknowns first
             sos = 'START_OF_SENTENCE'
+            unk = 'UNK'
             context = []
             for w_index in range(len(sentence)):
                 context = []
                 for sos_char in range(self.n - 1 - w_index):
                     context.append(sos)  # add appropriate number of start of sentence tokens
+                curr_word = ""
                 for offset in range(-min(w_index, self.n - 1), 1, 1):
-                    context.append(sentence[w_index + offset])  # add the remaining context to the list
+                    curr_word = sentence[w_index + offset]
+                    if curr_word in unks:
+                        curr_word = unk
+                    context.append(curr_word)  # add the remaining context to the list
+                if curr_word in unks:  # if the word (not context) is unk, increase its count
+                    self.totals[unk] += 1
                 self.inc_word(context)
 
             context.append('END_OF_SENTENCE')
             context.pop(0)
             self.inc_word(context)
 
+        def __unk_parse(self):
+            """Returns a list of unknown words"""
+            unknowns = set()
+            ltotal = log(sum(self.totals.values()), 2)  # total num of all words
+            for word, count in self.totals.items():  # get list of unknown words
+                if log(count, 2) - ltotal < self.lunk_prob:
+                    unknowns.add(word)
+
+            return unknowns
+
         def norm(self):
             """Normalize and convert to log2-probs."""
-            tot = 0.0
             for word in self.model:
-                tot += self.model[word]
-            ltot = log(tot, 2)
-            for word in self.model:
-                self.model[word] = log(self.model[word], 2) - ltot
+                ldenom = log(self.totals[word] + self.smooth * len(self.model), 2)
+                self.__norm_recurse(self.model[word], ldenom)
+
+        def __norm_recurse(self, d, ltotal):
+            for k, v in d.iteritems():
+                if isinstance(v, d):
+                    self.__norm_recurse(v, ltotal)
+                else:
+                    d[k] = log(d[k] + self.smooth, 2) - ltotal
 
         def cond_logprob(self, word, previous, numOOV):
             if word in self.model:
