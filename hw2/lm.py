@@ -84,7 +84,7 @@ class Unigram(LangModel):
     def fit_sentence(self, sentence):
         for w in sentence:
             self.inc_word(w)
-        self.inc_word('END_OF_SENTENCE')  # because spaces are stripped off?
+        self.inc_word('END_OF_SENTENCE')  # because periods are stripped off?
 
     def norm(self):
         """Normalize and convert to log2-probs."""
@@ -110,6 +110,7 @@ class Unigram(LangModel):
             from collections import defaultdict
             self.totals = defaultdict(int)  # total count for every word
             self.lunk_prob = log(unk_prob, 2)
+            self.contexts = defaultdict(int)  # total count for every context (not including word)
             if n > 0:
                 self.n = n
             else:
@@ -144,6 +145,9 @@ class Unigram(LangModel):
                         curr_level[w] += 1.0
                     else:
                         curr_level[w] = 1.0
+
+            # increment sum of all words given this context
+            self.contexts[context[:-1]] += 1
 
         def __get_totals(self, corpus):
             for s in corpus:
@@ -187,7 +191,7 @@ class Unigram(LangModel):
             return unknowns
 
         def norm(self):
-            """Normalize and convert to log2-probs."""
+            """Normalize and convert to log2-probs, including smoothing."""
             for word in self.model:
                 ldenom = log(self.totals[word] + self.smooth * len(self.model), 2)
                 self.__norm_recurse(self.model[word], ldenom)
@@ -200,10 +204,38 @@ class Unigram(LangModel):
                     d[k] = log(d[k] + self.smooth, 2) - ltotal
 
         def cond_logprob(self, word, previous, numOOV):
-            if word in self.model:
-                return self.model[word]
+            """Returns the conditional log probability given a word and its N-gram context.
+            The context is a list of the N-1 words before the given word."""
+            assert len(previous) == self.n - 1
+            V = len(self.vocab() - 1)
+            unk_factor = 1  # set to numOOV if word is an unknown
+            if word not in self.model:
+                word = 'UNK'
+                unk_factor = numOOV
+
+            if previous not in self.contexts:  # if context not found, return log(1/V)
+                return -log(len(V-1), 2) - log(unk_factor, 2)
+
+            #  go to dictionary containing word (n-1th level)
+            curr_level = self.model
+            for i in range(0, len(previous)):
+                curr_level = curr_level[previous[i]]
+            #  check if word hasn't appeared in this context
+            if word not in curr_level:
+                return log(self.smooth, 2) - log(self.smooth*V + self.contexts[previous]) - log(unk_factor, 2)
             else:
-                return self.lunk_prob - log(numOOV, 2)
+                cond_count = curr_level[word]
+                return log(self.smooth + cond_count, 2) - log(self.smooth*V + self.contexts[previous]) - log(unk_factor, 2)
 
         def vocab(self):
             return self.model.keys()
+
+        def perplexity(self, corpus):
+            """Computes the perplexity of the corpus by the model.
+
+            Assumes the model uses an EOS symbol at the end of each sentence.
+            """
+            vocab_set = set(self.vocab())
+            words_set = set([w for s in corpus for w in s])
+            numOOV = len(words_set - (vocab_set - 1))  # -1 b/c end of sentence is in model
+            return pow(2.0, self.entropy(corpus, numOOV))
