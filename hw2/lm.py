@@ -110,7 +110,8 @@ class Unigram(LangModel):
             from collections import defaultdict
             self.totals = defaultdict(int)  # total count for every word
             self.lunk_prob = log(unk_prob, 2)
-            self.contexts = defaultdict(int)  # total count for every context (not including word)
+            # self.contexts = defaultdict(int)  # total count for every context (not including word)
+            self.context_sum = 'CONTEXT_SUM'
             if n > 0:
                 self.n = n
             else:
@@ -131,6 +132,7 @@ class Unigram(LangModel):
             Example: ['Sam', 'I', 'am'] where the word is 'am', using a trigram model"""
 
             assert (len(context) == self.n)  # first check that the list is the correct length
+            context_sum = self.context_sum
 
             curr_level = self.model
             for i in range(self.n):
@@ -147,7 +149,12 @@ class Unigram(LangModel):
                         curr_level[w] = 1.0
 
             # increment sum of all words given this context
-            self.contexts[context[:-1]] += 1
+            if context_sum in curr_level:
+                curr_level[context_sum] += 1.0
+            else:
+                curr_level[context_sum] = 1.0
+
+            # self.contexts[context[:-1]] += 1
 
         def __get_totals(self, corpus):
             for s in corpus:
@@ -208,13 +215,14 @@ class Unigram(LangModel):
             The context is a list of the N-1 words before the given word."""
             assert len(previous) == self.n - 1
             V = len(self.vocab() - 1)
-            unk_factor = 1  # set to numOOV if word is an unknown
+            lunk_factor = 0  # set to numOOV if word is an unknown
             if word not in self.model:
                 word = 'UNK'
-                unk_factor = numOOV
+                lunk_factor = log(numOOV, 2)
 
-            if previous not in self.contexts:  # if context not found, return log(1/V)
-                return -log(len(V-1), 2) - log(unk_factor, 2)
+            num_in_context = self.__context_checker(previous)
+            if num_in_context == -1:  # if context not found, return log(1/V)
+                return -log(len(V-1), 2) - lunk_factor
 
             #  go to dictionary containing word (n-1th level)
             curr_level = self.model
@@ -222,10 +230,21 @@ class Unigram(LangModel):
                 curr_level = curr_level[previous[i]]
             #  check if word hasn't appeared in this context
             if word not in curr_level:
-                return log(self.smooth, 2) - log(self.smooth*V + self.contexts[previous]) - log(unk_factor, 2)
+                return log(self.smooth, 2) - log(self.smooth*V + num_in_context) - lunk_factor
             else:
                 cond_count = curr_level[word]
-                return log(self.smooth + cond_count, 2) - log(self.smooth*V + self.contexts[previous]) - log(unk_factor, 2)
+                return log(self.smooth + cond_count, 2) - log(self.smooth*V + num_in_context) - lunk_factor
+
+        def __context_checker(self, previous):
+            """Return -1 if context doesn't exist.
+            Else return the total number of words in this context"""
+            curr_level = self.model
+            for x in previous:
+                if x in curr_level:
+                    curr_level = curr_level[x]
+                else:
+                    return -1
+            return curr_level[self.context_sum]
 
         def vocab(self):
             return self.model.keys()
