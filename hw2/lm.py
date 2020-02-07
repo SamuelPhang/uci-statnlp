@@ -249,7 +249,7 @@ class Ngram(LangModel):
             if not self.backoff:
                 return log(self.smooth, 2) - log(self.smooth * V + num_in_context, 2) - lunk_factor
             else:
-                return self.totals[word] - lunk_factor # self.totals already normalized log probs from unk_parse
+                return self.totals[word] - lunk_factor  # self.totals already normalized log probs from unk_parse
         else:
             cond_count = curr_level[word]
             return log(self.smooth + cond_count, 2) - log(self.smooth * V + num_in_context, 2) - lunk_factor
@@ -274,6 +274,63 @@ class Ngram(LangModel):
                 self.vocab_list.add('UNK')
             return self.vocab_list
         # return self.model.keys()
+
+    def perplexity(self, corpus):
+        """Computes the perplexity of the corpus by the model.
+
+        Assumes the model uses an EOS symbol at the end of each sentence.
+        """
+        vocab_set = set(self.vocab())
+        words_set = set([w for s in corpus for w in s])
+        numOOV = len(words_set - vocab_set) + 1  # plus one to prevent math error
+        # print("OOV: " + str(numOOV))
+        return pow(2.0, self.entropy(corpus, numOOV))
+
+
+class BackoffTrigram(LangModel):
+    def __init__(self, unk_prob=0.0001, smooth=1):
+        self.trigram = Ngram(unk_prob, n=3, smooth=smooth, backoff=False)
+        self.bigram = Ngram(unk_prob, n=2, smooth=smooth, backoff=False)
+        self.context_sum = 'CONTEXT_SUM'
+        self.sos = 'START_OF_SENTENCE'
+
+    def fit_corpus(self, corpus):
+        self.trigram.fit_corpus(corpus)
+        self.bigram.fit_corpus(corpus)
+
+    def cond_logprob(self, word, previous, numOOV):
+        if len(previous) < 3 - 1:
+            num_sos = 3 - 1 - len(previous)
+            previous = [self.sos] * num_sos + previous
+        else:
+            previous = previous[len(previous) - 3 + 1: len(previous)]
+        assert len(previous) == 3 - 1
+        num_in_context = self.__context_checker(previous, self.trigram)
+        if num_in_context > 0 and word in self.trigram.model[previous[0]][previous[1]]:
+            return self.trigram.cond_logprob(word, previous, numOOV)
+
+        num_in_context = self.__context_checker(previous[1:], self.bigram)
+        if num_in_context > 0 and word in self.bigram.model[previous[1]]:
+            return self.bigram.cond_logprob(word, previous, numOOV)
+
+        if word in self.trigram.totals:
+            return self.trigram.totals[word]
+        else:
+            return -log(len(self.vocab()), 2)
+
+    def __context_checker(self, previous, lm):
+        """Return -1 if context doesn't exist.
+        Else return the total number of words given this context"""
+        curr_level = lm.model
+        for x in previous:
+            if x in curr_level:
+                curr_level = curr_level[x]
+            else:
+                return -1
+        return curr_level[self.context_sum]
+
+    def vocab(self):
+        return self.trigram.vocab()
 
     def perplexity(self, corpus):
         """Computes the perplexity of the corpus by the model.

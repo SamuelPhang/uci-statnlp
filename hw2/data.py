@@ -143,6 +143,51 @@ def learn_ngram(data, unk_prob=.0001, n=3, smooth=1):
     print("sample: ", " ".join(str(x) for x in sampler.sample_sentence(prefix)))
     return ngram
 
+
+def learn_backoff_trigram(data, unk_prob=.0001, smooth=1e-7):
+    from lm import BackoffTrigram
+    ngram = BackoffTrigram(unk_prob, smooth)
+    ngram.fit_corpus(data.train)
+    print("vocab:", len(ngram.vocab()))
+    # evaluate on train, test, and dev
+    print("train:", ngram.perplexity(data.train))
+    print("dev  :", ngram.perplexity(data.dev))
+    print("test :", ngram.perplexity(data.test))
+    from generator import Sampler
+    sampler = Sampler(ngram)
+    prefix = []
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence(prefix)))
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence(prefix)))
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence(prefix)))
+    return ngram
+
+def search_backoff(data, unk_prob=[.0001], smooth=[1e-7]):
+    from lm import BackoffTrigram
+    from numpy import inf
+    perplexity = inf
+    best_model = BackoffTrigram()
+    for up in unk_prob:
+        print("Trying unk_prob {}".format(up))
+        for s in smooth:
+            ngram = BackoffTrigram(up, s)
+            ngram.fit_corpus(data.train)
+            curr_perp = ngram.perplexity(data.dev)
+            if curr_perp < perplexity:
+                perplexity = curr_perp
+                best_model = ngram
+
+    print("vocab:", len(best_model.vocab()))
+    # evaluate on train, test, and dev
+    print("train:", best_model.perplexity(data.train))
+    print("dev  :", best_model.perplexity(data.dev))
+    print("test :", best_model.perplexity(data.test))
+    from generator import Sampler
+    sampler = Sampler(best_model)
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence([])))
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence([])))
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence([])))
+    return best_model
+
 def search_ngram(data, unk_prob, smooth, n=3, backoff=False):
     from lm import Ngram
     from numpy import inf
@@ -165,10 +210,9 @@ def search_ngram(data, unk_prob, smooth, n=3, backoff=False):
     print("test :", best_model.perplexity(data.test))
     from generator import Sampler
     sampler = Sampler(best_model)
-    prefix = []
-    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence(prefix)))
-    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence(prefix)))
-    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence(prefix)))
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence([])))
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence([])))
+    print("sample: ", " ".join(str(x) for x in sampler.sample_sentence([])))
     return best_model
 
 
@@ -238,7 +282,8 @@ if __name__ == "__main__":
         # model = learn_ngram(data, n=3, unk_prob=10e-6, smooth=1e-5)
         # model = learn_3gram_interp(data, unk_prob=10e-7, smooth=1e-5)
         import numpy as np
-        model = search_ngram(data, np.logspace(-7, -2, 12), np.logspace(-7, -1, 14), backoff=True)
+        # model = search_ngram(data, np.logspace(-8, -7, 10), np.logspace(-7, -6, 10), backoff=True)
+        model =search_backoff(data, np.logspace(-8, -6, 10), np.logspace(-7, -6, 10))
         models.append(model)
     # compute the perplexity of all pairs
     n = len(dnames)
