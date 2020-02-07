@@ -268,4 +268,5 @@ class Ngram(LangModel):
         vocab_set = set(self.vocab())
         words_set = set([w for s in corpus for w in s])
         numOOV = len(words_set - vocab_set)
+        print("OOV: " + str(numOOV))
         return pow(2.0, self.entropy(corpus, numOOV))
