@@ -13,15 +13,18 @@ def train_classifier(X, y):
         from sklearn import preprocessing
         X = preprocessing.scale(X, with_mean=False)
 
-    if g.use_grid_search:
-        clf = GridSearchCV(
-            LogisticRegression(), g.gridSearchParams, n_jobs=g.num_jobs, verbose=g.gridsearch_verbosity
-        )
-        clf.fit(X, y)
-        print(clf.best_params_)
-        cls = LogisticRegression(**clf.best_params_, verbose=g.training_verbosity)
+    if g.use_default:
+        cls = LogisticRegression()
     else:
-        cls = LogisticRegression(**g.nonGridSearchParams, verbose=g.training_verbosity)
+        if g.use_grid_search:
+            clf = GridSearchCV(
+                LogisticRegression(), g.gridSearchParams, n_jobs=g.num_jobs, verbose=g.gridsearch_verbosity
+            )
+            clf.fit(X, y)
+            print(clf.best_params_)
+            cls = LogisticRegression(**clf.best_params_, verbose=g.training_verbosity)
+        else:
+            cls = LogisticRegression(**g.nonGridSearchParams, verbose=g.training_verbosity)
     cls.fit(X, y)
     return cls
 

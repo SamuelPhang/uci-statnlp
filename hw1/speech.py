@@ -34,11 +34,17 @@ def read_files(tarfname):
 
     if g.tfidf:
         from sklearn.feature_extraction.text import TfidfVectorizer
-        speech.count_vect = TfidfVectorizer(stop_words=g.stop_vocab, ngram_range=(g.ngram_min, g.ngram_max), use_idf=g.use_idf,
+        if g.use_default:
+            speech.count_vect = TfidfVectorizer()
+        else:
+            speech.count_vect = TfidfVectorizer(stop_words=g.stop_vocab, ngram_range=(g.ngram_min, g.ngram_max), use_idf=g.use_idf,
                                             analyzer=g.analyzer, sublinear_tf=g.sublinear_tf, binary=g.binary, tokenizer=g.tokenizer)
     else:
         from sklearn.feature_extraction.text import CountVectorizer
-        speech.count_vect = CountVectorizer(ngram_range=(g.ngram_min, g.ngram_max), binary=g.binary, tokenizer=g.tokenizer)
+        if g.use_default:
+            speech.count_vect = CountVectorizer()
+        else:
+            speech.count_vect = CountVectorizer(ngram_range=(g.ngram_min, g.ngram_max), binary=g.binary, tokenizer=g.tokenizer)
     speech.trainX = speech.count_vect.fit_transform(speech.train_data)
     speech.devX = speech.count_vect.transform(speech.dev_data)
     from sklearn import preprocessing
@@ -176,7 +182,7 @@ def read_instance(tar, ifname):
     return content
 
 
-def main():
+if __name__=="__main__":
     print("Reading data")
     tarfname = "data/speech.tar.gz"
     speech = read_files(tarfname)
@@ -188,14 +194,11 @@ def main():
     classify.evaluate(speech.trainX, speech.trainy, cls)
     classify.evaluate(speech.devX, speech.devy, cls)
 
-    print("Reading unlabeled data")
-    unlabeled = read_unlabeled(tarfname, speech)
-    print("Writing pred file")
-    write_pred_kaggle_file(unlabeled, cls, "data/speech-pred.csv", speech)
+    # print("Reading unlabeled data")
+    # unlabeled = read_unlabeled(tarfname, speech)
+    # print("Writing pred file")
+    # write_pred_kaggle_file(unlabeled, cls, "data/speech-pred.csv", speech)
 
-
-if __name__ == "__main__":
-    main()
 # You can't run this since you do not have the true labels
 # print "Writing gold file"
 # write_gold_kaggle_file("data/speech-unlabeled.tsv", "data/speech-gold.csv")

@@ -46,5 +46,5 @@ if __name__ == "__main__":
         [lmtzr.lemmatize(word).lower().strip('.,;:') for word in word_tokenize(d.decode("utf-8")) if len(word) >= g.min_length] for d
         in docs]
     print("Computing Word2Vec Matrix")
-    wv = Word2Vec(lemmatized, workers=g.num_jobs, min_count=0)
+    wv = Word2Vec(lemmatized, workers=g.num_jobs)
     wv.save("word2vec.model")

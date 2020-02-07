@@ -6,12 +6,16 @@ num_jobs = 6
 gridsearch_verbosity = 3
 training_verbosity = 0
 
+use_default = False # use default parameters for the vectorizers and classifier
+tfidf = True
+use_grid_search = False
+
 solver = ['liblinear', 'sag', 'lbfgs']
 scaling = False
 
 #word2vec params
 min_length = 1
-importance = .001
+importance = 0.01
 
 #tfidfvectorizer params
 import nltk
@@ -25,17 +29,16 @@ class LemmaTokenizer:
     def __call__(self, doc):
         return [self.wnl.lemmatize(t).lower().strip('.,;:') for t in word_tokenize(doc) if len(t) >= min_length]
 
-tfidf = True
-analyzer = 'word' #char_wb'
+
+analyzer = 'word' #'char_wb'
 use_idf = True
 ngram_min = 1
 ngram_max = 1
-stop_vocab = None #['the', 'a', 'an', 'and', 'of', 'that', 'to']
+stop_vocab = None  # ['the', 'a', 'an', 'and', 'of', 'that', 'to']
 sublinear_tf = True
 binary = False
 tokenizer = LemmaTokenizer() #None
 
-use_grid_search = False
 gridSearchParams = {'C': C,
                     'solver': solver,
                     'max_iter': [max_iter]}

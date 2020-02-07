@@ -106,16 +106,19 @@ class Unigram(LangModel):
 
 
 class Ngram(LangModel):
-    def __init__(self, unk_prob=0.0001, n=3, smooth=1):
+    def __init__(self, unk_prob=0.0001, n=3, smooth=1, backoff=False):
         self.model = dict()
         from collections import defaultdict
+        from numpy import inf
         self.totals = defaultdict(int)  # total count for every word
-        self.lunk_prob = log(unk_prob, 2)
+        self.lunk_prob = log(unk_prob, 2) if unk_prob > 0 else -inf
         self.smooth = smooth
         # self.contexts = defaultdict(int)  # total count for every context (not including word)
         self.context_sum = 'CONTEXT_SUM'
         self.sos = 'START_OF_SENTENCE'
         self.unks = set()
+        self.vocab_list = None
+        self.backoff = backoff
         if n > 0:
             self.n = n
         else:
@@ -193,41 +196,43 @@ class Ngram(LangModel):
         self.inc_word(context)
 
     def __unk_parse(self):
-        """Returns a list of unknown words"""
+        """Returns a list of unknown words and normalizes counts in self.total"""
         unknowns = set()
         ltotal = log(sum(self.totals.values()), 2)  # total num of all words
         for word, count in self.totals.items():  # get list of unknown words
-            if log(count, 2) - ltotal < self.lunk_prob:
+            lprob = log(count, 2) - ltotal
+            self.totals[word] = lprob
+            if lprob < self.lunk_prob:
                 unknowns.add(word)
 
         return unknowns
 
-    def norm(self):
-        """Normalize and convert to log2-probs, including smoothing."""
-        for word in self.model:
-            ldenom = log(self.totals[word] + self.smooth * len(self.model), 2)
-            self.__norm_recurse(self.model[word], ldenom)
-
-    def __norm_recurse(self, d, ltotal):
-        for k, v in d.iteritems():
-            if isinstance(v, d):
-                self.__norm_recurse(v, ltotal)
-            else:
-                d[k] = log(d[k] + self.smooth, 2) - ltotal
+    # def norm(self):
+    #     """Normalize and convert to log2-probs, including smoothing."""
+    #     for word in self.model:
+    #         ldenom = log(self.totals[word] + self.smooth * len(self.model), 2)
+    #         self.__norm_recurse(self.model[word], ldenom)
+    #
+    # def __norm_recurse(self, d, ltotal):
+    #     for k, v in d.iteritems():
+    #         if isinstance(v, d):
+    #             self.__norm_recurse(v, ltotal)
+    #         else:
+    #             d[k] = log(d[k] + self.smooth, 2) - ltotal
 
     def cond_logprob(self, word, previous, numOOV):
         """Returns the conditional log probability given a word and its N-gram context.
         The context is all the words in a sentence before the given word."""
         if len(previous) < self.n - 1:
             num_sos = self.n - 1 - len(previous)
-            previous = [self.sos]*num_sos + previous
+            previous = [self.sos] * num_sos + previous
         else:
             previous = previous[len(previous) - self.n + 1: len(previous)]
         assert len(previous) == self.n - 1
 
         V = len(self.vocab())
         lunk_factor = 0  # set to numOOV if word is an unknown
-        if word not in self.model:
+        if word not in self.vocab():
             word = 'UNK'
             lunk_factor = log(numOOV, 2)
 
@@ -241,10 +246,13 @@ class Ngram(LangModel):
             curr_level = curr_level[previous[i]]
         #  check if word hasn't appeared in this context
         if word not in curr_level:
-            return log(self.smooth, 2) - log(self.smooth*V + num_in_context, 2) - lunk_factor
+            if not self.backoff:
+                return log(self.smooth, 2) - log(self.smooth * V + num_in_context, 2) - lunk_factor
+            else:
+                return self.totals[word] - lunk_factor # self.totals already normalized log probs from unk_parse
         else:
             cond_count = curr_level[word]
-            return log(self.smooth + cond_count, 2) - log(self.smooth*V + num_in_context, 2) - lunk_factor
+            return log(self.smooth + cond_count, 2) - log(self.smooth * V + num_in_context, 2) - lunk_factor
 
     def __context_checker(self, previous):
         """Return -1 if context doesn't exist.
@@ -258,7 +266,14 @@ class Ngram(LangModel):
         return curr_level[self.context_sum]
 
     def vocab(self):
-        return self.model.keys()
+        if self.vocab_list is not None:
+            return self.vocab_list
+        else:
+            self.vocab_list = set(self.totals.keys()) - self.unks
+            if not self.vocab_list:
+                self.vocab_list.add('UNK')
+            return self.vocab_list
+        # return self.model.keys()
 
     def perplexity(self, corpus):
         """Computes the perplexity of the corpus by the model.
@@ -267,6 +282,6 @@ class Ngram(LangModel):
         """
         vocab_set = set(self.vocab())
         words_set = set([w for s in corpus for w in s])
-        numOOV = len(words_set - vocab_set)
-        print("OOV: " + str(numOOV))
+        numOOV = len(words_set - vocab_set) + 1  # plus one to prevent math error
+        # print("OOV: " + str(numOOV))
         return pow(2.0, self.entropy(corpus, numOOV))

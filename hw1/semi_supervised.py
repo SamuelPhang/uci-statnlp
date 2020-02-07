@@ -1,6 +1,7 @@
 import hw1.global_settings as g
 from hw1.speech import *
 from gensim.models import Word2Vec
+import numpy as np
 import sys
 
 def read_unlabeled(tarfname, speech):
@@ -41,6 +42,7 @@ def dev_evaluate(X, yt, cls, dev_corpus, vectorizer):
     yp = cls.predict(X)
     acc = metrics.accuracy_score(yt, yp)
     print("  Accuracy", acc)
+    return yp
 
 
 def adjust_features_wv(X, corpus, vectorizer):
@@ -55,10 +57,12 @@ def adjust_features_wv(X, corpus, vectorizer):
     lemmatized = [[lmtzr.lemmatize(word).lower() for word in word_tokenize(doc.decode("utf-8")) if len(word) >= g.min_length] for doc in
                   corpus]
 
-    wv = Word2Vec.load('word2vec.model')
+    wv = Word2Vec.load('word2vec_old.model')
     X = X.tolil()
 
     for doc_index in range(len(corpus)):
+        if (doc_index%100 == 0):
+            print("Adjusting doc number; " + str(doc_index))
         for word in lemmatized[doc_index]:
             if word not in vectorizer.vocabulary_:
                 # print(word + " not in vectorizer vocab")
@@ -92,15 +96,14 @@ if __name__ == "__main__":
     cls = classify.train_classifier(speech.trainX, speech.trainy)
     print("Evaluating")
     classify.evaluate(speech.trainX, speech.trainy, cls)
-    dev_evaluate(speech.devX, speech.devy, cls, speech.dev_data, speech.count_vect)
+    predictions = dev_evaluate(speech.devX, speech.devy, cls, speech.dev_data, speech.count_vect)
 
-    print("Reading unlabeled data")
-    unlabeled = read_unlabeled(tarfname, speech)
-    print("Writing pred file")
-
-    unlabeled.X = adjust_features_wv(unlabeled.X, unlabeled.data, speech.count_vect)
-    write_pred_kaggle_file(unlabeled, cls, "data/speech-pred.csv", speech)
-
+    # print("Reading unlabeled data")
+    # unlabeled = read_unlabeled(tarfname, speech)
+    # print("Writing pred file")
+    #
+    # unlabeled.X = adjust_features_wv(unlabeled.X, unlabeled.data, speech.count_vect)
+    # write_pred_kaggle_file(unlabeled, cls, "data/speech-pred.csv", speech)
 
 # if __name__ == "__main__":
 #     main()

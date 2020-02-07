@@ -24,11 +24,9 @@ def top_mean_feats(Xtr, features, grp_ids, min_tfidf=0.1, top_n=25):
     return top_tfidf_feats(tfidf_means, features, top_n)
 
 if __name__ == "__main__":
-    s.main()
-
 #get top tfidf scores averaged
     rand_indices = np.random.randint(0, (speech.trainX.shape[0]) - 1, 50)
-    df = top_mean_feats(speech.trainX, speech.count_vect.get_feature_names(), rand_indices, top_n=100)
+    df = top_mean_feats(speech.trainX, speech.count_vect.get_feature_names(), rand_indices, top_n=10)
     print(df[-10:])
 
 #get highest weighted features
