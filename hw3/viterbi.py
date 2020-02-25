@@ -25,10 +25,15 @@ def run_viterbi(emission_scores, trans_scores, start_scores, end_scores):
     N = emission_scores.shape[0]
 
     y = [] # score table
-    sequence = [] # final sequence
+    sequence = [0]*N # final sequence
+    bp = [] # backpointers
     # init table, N rows and L columns
     for i in range(N):
         y.append([0]*L)
+
+    # init backpointer table, N-1 rows, L columns
+    for i in range(N-1):
+        bp.append([0]*L)
 
     for i in range(N):
         for y_i in range(L):
@@ -41,17 +46,23 @@ def run_viterbi(emission_scores, trans_scores, start_scores, end_scores):
                 else: # else lookup transition score in table
                     score = emission_scores[i][y_i] + trans_scores[y_prev][y_i] + y[i-1][y_prev]
                 
-                max_score = max(score, max_score)
+                if score > max_score:
+                    max_score = score
+                    if i > 0: # update backpointer table
+                        bp[i-1][y_i] = y_prev
             y[i][y_i] = max_score 
 
     final_score = float("-inf")
     for y_end in range(L): # consider end transition scores, assume zero emission for eos
         # y_end is the label of the last token
         score = end_scores[y_end] + y[N-1][y_end]
-        final_score = max(score, final_score)
+        if score > final_score:            
+            final_score = score
+            sequence[-1] = y_end
 
-    # TODO: get sequence
-    sequence = [0]*N
+    # build sequence:
+    for i in range(-1, -N, -1):
+        sequence[i-1] = bp[i][sequence[i]]
 
     # score set to 0
     return (final_score, sequence)
